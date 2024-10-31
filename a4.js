@@ -6,7 +6,6 @@ let normals = [];
 
 class Face {
   constructor(vertices, normals) {
-    console.log(normals);
     this.vertices = vertices;
 
     let normalX = 0;
@@ -21,9 +20,24 @@ class Face {
     normalX /= normals.length;
     normalY /= normals.length;
     normalZ /= normals.length;
+    this.normal = [normalX, normalY, normalZ];
 
-    this.normals = [normalX, normalY, normalZ];
+    let centerX = 0;
+    let centerY = 0;
+    let centerZ = 0;
+    vertices.forEach((vertex) => {
+      centerX += vertex[0];
+      centerY += vertex[1];
+      centerZ += vertex[2];
+    });
+    this.centerPoint = [centerX, centerY, centerZ];
+    this.distance = 0;
   }
+}
+
+// taken from stackoverflow (https://stackoverflow.com/questions/5649803/remap-or-map-function-in-javascript)
+function remap(value, low1, high1, low2, high2) {
+  return low2 + ((high2 - low2) * (value - low1)) / (high1 - low1);
 }
 
 // parse wavefront obj file and load into arrays
@@ -98,12 +112,6 @@ function loadObject(path) {
             face.push(vertices[vertexData[0] - 1]);
             vertexNormals.push(normals[vertexData[2] - 1]);
           });
-          /*
-          console.log(face);
-          console.log(vertexNormals);
-          console.log("=====");
-          */
-
           faces.push(new Face(face, vertexNormals));
         }
       });
@@ -129,6 +137,8 @@ function setup() {
 
   let wireframe = document.getElementById("wireframe");
   let shading = document.getElementById("shading");
+  let cullBackfaces = document.getElementById("cullBackfaces");
+  let orthographic = document.getElementById("orthographic");
 
   // matrix draw methods
   function moveToTx(x, y, Tx) {
@@ -227,7 +237,7 @@ function setup() {
       context.stroke();
     }
 
-    function drawObject(Tx) {
+    function drawObject(Tx, cameraPos, lightDir) {
       for (let faceIndex = 0; faceIndex < faces.length; faceIndex++) {
         context.strokeStyle = "#AAAAAA";
         //context.fillStyle = "#f7dea844";
@@ -246,19 +256,34 @@ function setup() {
         }
         context.closePath();
         wireframe.checked ? context.stroke() : "";
-        if (shading) {
-          let lightDirection = [1, 1, 0];
-          let normal = faces[faceIndex].normals;
-          //console.log(normal);
-          let lightingFactor = vec3.dot(lightDirection, normal);
+        if (shading.checked) {
+          let normal = faces[faceIndex].normal;
+
+          // backface culling
+          if (cullBackfaces.checked) {
+            let normalizedCameraPos = vec3.create();
+            vec3.normalize(normalizedCameraPos, cameraPos);
+            let backfaceTest = vec3.dot(normalizedCameraPos, normal);
+            if (backfaceTest <= 0) continue;
+          }
+
+          let lightingFactor = Math.max(0, vec3.dot(lightDirection, normal));
+          lightingFactor = remap(lightingFactor, 0, 1, 0.5, 1);
           context.fillStyle = `rgba(${247 * lightingFactor}, ${
             222 * lightingFactor
           }, ${168 * lightingFactor}, ${
-            1 - (2.55 / 100) * parseFloat(opacity.value)
+            1 - (1 / 100) * parseFloat(opacity.value)
           })`;
         }
         context.fill();
+
+        // find the distance of a face to sort rendering order
+        faces[faceIndex].distance = vec3.distance(
+          faces[faceIndex].centerPoint,
+          cameraPos
+        );
       }
+      faces.sort((a, b) => b.distance - a.distance);
     }
 
     let cameraDistance = Number(distance.value);
@@ -272,13 +297,44 @@ function setup() {
       cameraDistance * Math.cos((rotation.value * 2 * Math.PI) / 100);
     mat4.lookAt(lookAtTransform, cameraPos, [0, 0, 0], [0, 1, 0]);
 
+    let viewportProjectionTransform = mat4.create();
+    orthographic.checked
+      ? mat4.ortho(viewportProjectionTransform, -1, 1, -1, 1, -1, 1)
+      : mat4.perspective(
+          viewportProjectionTransform,
+          Math.PI / 100,
+          1,
+          0.0,
+          100
+        );
+
+    // directional light direction
+    let lightDirection = [1, 1, 0];
+
     context.clearRect(0, 0, canvas.width, canvas.height);
+
+    context.fillStyle = "#343434";
+    context.lineWidth = 10;
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(canvas.width, 0);
+    context.lineTo(canvas.width, canvas.height);
+    context.lineTo(0, canvas.height);
+    context.closePath();
+    context.fill();
 
     let canvasTransform = mat4.create();
     mat4.translate(canvasTransform, canvasTransform, [300, 300, 0]);
     mat4.scale(canvasTransform, canvasTransform, [150, 150, 150]);
+    let canvasToProjection = mat4.create();
+    mat4.multiply(
+      canvasToProjection,
+      canvasTransform,
+      viewportProjectionTransform
+    );
+
     let canvasToLookAt = mat4.create();
-    mat4.multiply(canvasToLookAt, canvasTransform, lookAtTransform);
+    mat4.multiply(canvasToLookAt, canvasToProjection, lookAtTransform);
 
     // axes transforms
     let axesToCanvas = mat4.create();
@@ -293,7 +349,7 @@ function setup() {
     mat4.multiply(objectToCanvas, canvasToLookAt, objectToCanvas);
 
     //drawCircle(objectToCanvas);
-    drawObject(objectToCanvas, canvasToLookAt);
+    drawObject(objectToCanvas, cameraPos, lightDirection);
 
     window.requestAnimationFrame(draw);
   }

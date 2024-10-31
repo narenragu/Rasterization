@@ -20,25 +20,33 @@
       </div>
       <div style="margin: 5px">
         <h2>Controls</h2>
-        <input id="rotation" type="range" min="0" max="100" value="0" />
+        <h4>Camera Settings</h4>
+        <input id="rotation" type="range" min="0" max="100" value="10" />
         <label for="rotation" id="rotationText">Camera Rotation</label>
         <br />
-        <input id="height" type="range" min="-100" max="100" value="50" />
+        <input id="height" type="range" min="-100" max="100" value="10" />
         <label for="height" id="heightText">Camera Height</label>
         <br />
-        <input id="distance" type="range" min="0" max="100" value="50" />
+        <input id="distance" type="range" min="0" max="100" value="65" />
         <label for="distance" id="distanceText">Camera Distance</label>
-
         <br />
+        <h4>Render Settings</h4>
         <input id="wireframe" type="checkbox" checked />
         <label for="wireframe" id="wireframeText">Show Wireframe?</label>
-
         <br />
-        <input id="opacity" type="range" min="0" max="100" value="25" />
-        <label for="opacity" id="opacityText">Opacity</label>
         <input id="shading" type="checkbox" checked />
         <label for="shading" id="shadingText">Shading?</label>
         <br />
+        <input id="cullBackfaces" type="checkbox" />
+        <label for="cullBackfaces" id="cullBackfacesText"
+          >Cull Backfaces?</label
+        >
+        <br />
+        <input id="orthographic" type="checkbox" />
+        <label for="orthographic" id="orthographicText">Orthographic?</label>
+        <br />
+        <input id="opacity" type="range" min="0" max="100" value="0" />
+        <label for="opacity" id="opacityText">Material Opacity</label>
       </div>
     </div>
     <script type="text/javascript" src="gl-matrix-min.js"></script>
